@@ -71,10 +71,26 @@ impl CPU {
         memory.initialize();
     }
 
+    //opcodes
+    const INS_LDA_IM: Byte = 0xA9;
+
     fn execute(&mut self, cycles: u32, memory: &Mem) {
         let mut cycles = cycles;
         while cycles > 0u32 {
             let ins: Byte = self.fetch_byte(&mut cycles, memory);
+
+            match ins {
+                Self::INS_LDA_IM => {
+                    let value: Byte = self.fetch_byte(&mut cycles, memory);
+                    let a = value;
+                    self.set_a(a);
+                    self.set_z(if a == 0 {1} else {0});
+                    self.set_n(if a & 0b10000000 == 0 {0} else {1});
+                }
+                _ => {
+                    unimplemented!();
+                }
+            }
         }
     }
 
