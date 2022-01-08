@@ -1,5 +1,5 @@
 use modular_bitfield::*;
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 type Byte = u8;
 type Word = u16;
@@ -29,6 +29,12 @@ impl Index<u16> for Mem {
 
     fn index(&self, index: u16) -> &Byte {
         &self.data[index as usize]
+    }
+}
+
+impl IndexMut<u16> for Mem {
+    fn index_mut(&mut self, index: u16) -> &mut Self::Output {
+        &mut self.data[index as usize]
     }
 }
 
@@ -88,7 +94,7 @@ impl CPU {
                     self.set_n(if a & 0b10000000 == 0 {0} else {1});
                 }
                 _ => {
-                    unimplemented!();
+                    unimplemented!("Instruction not handled {}", ins);
                 }
             }
         }
@@ -107,5 +113,9 @@ fn main() {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
     cpu.reset(&mut mem);
+    //start - inline a little program
+    mem[0xFFFC] = CPU::INS_LDA_IM;
+    mem[0xFFFD] = 0x42;
+    //end - inline a little program
     cpu.execute(2, &mut mem);
 }
