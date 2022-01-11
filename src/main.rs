@@ -79,6 +79,14 @@ impl CPU {
 
     //opcodes
     const INS_LDA_IM: Byte = 0xA9;
+    const INS_LDA_ZP: Byte = 0xA5;
+
+    fn LDA_set_status(&mut self) {
+        let a = self.a();
+
+        self.set_z(if a == 0 {1} else {0});
+        self.set_n(if a & 0b10000000 == 0 {0} else {1});
+    }
 
     fn execute(&mut self, cycles: u32, memory: &Mem) {
         let mut cycles = cycles;
@@ -88,10 +96,14 @@ impl CPU {
             match ins {
                 Self::INS_LDA_IM => {
                     let value: Byte = self.fetch_byte(&mut cycles, memory);
-                    let a = value;
-                    self.set_a(a);
-                    self.set_z(if a == 0 {1} else {0});
-                    self.set_n(if a & 0b10000000 == 0 {0} else {1});
+                    self.set_a(value);
+                    self.LDA_set_status();
+                }
+                Self::INS_LDA_ZP => {
+                    let zero_page_address: Byte = self.fetch_byte(&mut cycles, memory);
+                    let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
+                    self.set_a(value);
+                    self.LDA_set_status();
                 }
                 _ => {
                     unimplemented!("Instruction not handled {}", ins);
@@ -107,6 +119,18 @@ impl CPU {
 
         data
     }
+
+    fn read_byte(
+        &mut self,
+        cycles: &mut u32,
+        address: Byte,
+        memory: &Mem,
+    ) -> Byte {
+        let data: Byte = memory[address as u16];
+        *cycles = *cycles - 1;
+
+        data
+    }
 }
 
 fn main() {
@@ -114,8 +138,10 @@ fn main() {
     let mut cpu = CPU::new();
     cpu.reset(&mut mem);
     //start - inline a little program
-    mem[0xFFFC] = CPU::INS_LDA_IM;
+    mem[0xFFFC] = CPU::INS_LDA_ZP;
     mem[0xFFFD] = 0x42;
+    mem[0x0042] = 0x84;
     //end - inline a little program
-    cpu.execute(2, &mut mem);
+    cpu.execute(3, &mut mem);
+    mem[0x0042] = 0x84;
 }
