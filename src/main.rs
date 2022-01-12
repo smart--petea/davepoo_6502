@@ -80,6 +80,7 @@ impl CPU {
     //opcodes
     const INS_LDA_IM: Byte = 0xA9;
     const INS_LDA_ZP: Byte = 0xA5;
+    const INS_LDA_ZPX: Byte = 0xB5;
 
     fn LDA_set_status(&mut self) {
         let a = self.a();
@@ -105,11 +106,38 @@ impl CPU {
                     self.set_a(value);
                     self.LDA_set_status();
                 }
+                Self::INS_LDA_ZPX => {
+                    let mut zero_page_address: Byte = self.fetch_byte(&mut cycles, memory);
+                    zero_page_address = zero_page_address + self.x();
+                    cycles = cycles - 1;
+
+                    let value: Byte = self.fetch_byte(&mut cycles, memory);
+                    self.set_a(value);
+                    self.LDA_set_status();
+                }
                 _ => {
                     unimplemented!("Instruction not handled {}", ins);
                 }
             }
         }
+    }
+
+    fn fetch_word(&mut self, cycles: &mut u32, memory: &Mem) -> Word {
+        //6502 is little endian
+        let mut data: Word = memory[self.pc()] as Word;
+        self.set_pc(self.pc() + 1);
+
+        data = data | ((memory[self.pc()] as Word) << 8);
+        self.set_pc(self.pc() + 1);
+
+        *cycles = *cycles - 2;
+
+        //if you wanted to handle endianess
+        //you would have to swap bytes here
+        //if (PLATFORM_BIG_ENDIAN)
+        //  SwapBytesInWord()
+
+        data
     }
 
     fn fetch_byte(&mut self, cycles: &mut u32, memory: &Mem) -> Byte {
