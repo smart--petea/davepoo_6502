@@ -24,6 +24,22 @@ impl Mem {
     }
 }
 
+impl Mem {
+    /** write 2 bytes */
+    pub fn write_word(
+        &mut self,
+        value: Word,
+        address: u16,
+        cycles: &mut u32
+    ) {
+        let  address = address as usize;
+        self.data[address] = (value & 0xFF) as Byte;
+        self.data[address + 1] = (value >> 8) as Byte;
+
+        *cycles = *cycles - 2;
+    }
+}
+
 impl Index<u16> for Mem {
     type Output=Byte;
 
@@ -81,6 +97,7 @@ impl CPU {
     const INS_LDA_IM: Byte = 0xA9;
     const INS_LDA_ZP: Byte = 0xA5;
     const INS_LDA_ZPX: Byte = 0xB5;
+    const INS_JSR: Byte = 0x20;
 
     fn LDA_set_status(&mut self) {
         let a = self.a();
@@ -89,7 +106,7 @@ impl CPU {
         self.set_n(if a & 0b10000000 == 0 {0} else {1});
     }
 
-    fn execute(&mut self, cycles: u32, memory: &Mem) {
+    fn execute(&mut self, cycles: u32, memory: &mut Mem) {
         let mut cycles = cycles;
         while cycles > 0u32 {
             let ins: Byte = self.fetch_byte(&mut cycles, memory);
@@ -114,6 +131,13 @@ impl CPU {
                     let value: Byte = self.fetch_byte(&mut cycles, memory);
                     self.set_a(value);
                     self.LDA_set_status();
+                }
+                Self::INS_JSR => {
+                    let sub_addr: Word = self.fetch_word(&mut cycles, memory);
+                    memory.write_word(self.pc() - 1, self.sp(), &mut cycles);
+
+                    self.set_pc(sub_addr);
+                    cycles = cycles - 1;
                 }
                 _ => {
                     unimplemented!("Instruction not handled {}", ins);
@@ -166,7 +190,7 @@ fn main() {
     let mut cpu = CPU::new();
     cpu.reset(&mut mem);
     //start - inline a little program
-    mem[0xFFFC] = CPU::INS_LDA_ZP;
+    mem[0xFFFC] = CPU::INS_JSR;
     mem[0xFFFD] = 0x42;
     mem[0x0042] = 0x84;
     //end - inline a little program
