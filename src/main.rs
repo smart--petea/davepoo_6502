@@ -151,7 +151,11 @@ impl CPU {
         let mut data: Word = memory[self.pc()] as Word;
         self.set_pc(self.pc() + 1);
 
-        data = data | ((memory[self.pc()] as Word) << 8);
+        let x = memory[self.pc()];
+        let y = x as Word;
+        let z = y << 8;
+        data = data | z;
+        //data = data | (( memory[self.pc()] as Word) << 8);
         self.set_pc(self.pc() + 1);
 
         *cycles = *cycles - 2;
@@ -192,8 +196,10 @@ fn main() {
     //start - inline a little program
     mem[0xFFFC] = CPU::INS_JSR;
     mem[0xFFFD] = 0x42;
-    mem[0x0042] = 0x84;
+    mem[0xFFFE] = 0x42;
+    mem[0x4242] = CPU::INS_LDA_IM;
+    mem[0x4243] = 0x84;
     //end - inline a little program
-    cpu.execute(3, &mut mem);
+    cpu.execute(8, &mut mem);
     mem[0x0042] = 0x84;
 }
