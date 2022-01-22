@@ -188,3 +188,25 @@ impl CPU {
         data
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lda_immediate_can_load_a_value_into_the_A_register() {
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        mem[0xFFFC] = CPU::INS_LDA_IM;
+        mem[0xFFFD] = 0x84;
+
+        //when:
+        cpu.execute(2, &mut mem);
+
+        //then:
+        assert_eq!(cpu.a(), 0x84);
+    }
+}
