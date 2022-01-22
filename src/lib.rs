@@ -3,6 +3,7 @@ use std::ops::{Index, IndexMut};
 
 type Byte = u8;
 type Word = u16;
+type s32 = i32;
 
 const MAX_MEM: usize = 1024 * 64;
 pub struct Mem
@@ -55,13 +56,14 @@ impl IndexMut<u16> for Mem {
 }
 
 #[bitfield]
+#[derive(Debug, Clone)]
 pub struct CPU {
     pc: Word, //program counter
     sp: Word, //stack pointer
 
-    a: Byte, //registers
-    x: Byte, //registers
-    y: Byte, //registers
+    pub a: Byte, //registers
+    pub x: Byte, //registers
+    pub y: Byte, //registers
 
     c: specifiers::B1, //status flag
     z: specifiers::B1, //status flag
@@ -99,14 +101,16 @@ impl CPU {
     pub const INS_LDA_ZPX: Byte = 0xB5;
     pub const INS_JSR: Byte = 0x20;
 
-    fn LDA_set_status(&mut self) {
+    fn lda_set_status(&mut self) {
         let a = self.a();
 
         self.set_z(if a == 0 {1} else {0});
         self.set_n(if a & 0b10000000 == 0 {0} else {1});
     }
 
-    pub fn execute(&mut self, cycles: u32, memory: &mut Mem) {
+    //@return the number of cycles that were used
+    pub fn execute(&mut self, cycles: u32, memory: &mut Mem) -> s32 {
+        let cycles_requested = cycles;
         let mut cycles = cycles;
         while cycles > 0u32 {
             let ins: Byte = self.fetch_byte(&mut cycles, memory);
@@ -115,22 +119,22 @@ impl CPU {
                 Self::INS_LDA_IM => {
                     let value: Byte = self.fetch_byte(&mut cycles, memory);
                     self.set_a(value);
-                    self.LDA_set_status();
+                    self.lda_set_status();
                 }
                 Self::INS_LDA_ZP => {
                     let zero_page_address: Byte = self.fetch_byte(&mut cycles, memory);
                     let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
                     self.set_a(value);
-                    self.LDA_set_status();
+                    self.lda_set_status();
                 }
                 Self::INS_LDA_ZPX => {
                     let mut zero_page_address: Byte = self.fetch_byte(&mut cycles, memory);
-                    zero_page_address = zero_page_address + self.x();
+                    zero_page_address = ((zero_page_address as Word + self.x() as Word) & 0xFF) as Byte;
                     cycles = cycles - 1;
 
-                    let value: Byte = self.fetch_byte(&mut cycles, memory);
+                    let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
                     self.set_a(value);
-                    self.LDA_set_status();
+                    self.lda_set_status();
                 }
                 Self::INS_JSR => {
                     let sub_addr: Word = self.fetch_word(&mut cycles, memory);
@@ -144,6 +148,9 @@ impl CPU {
                 }
             }
         }
+
+        let num_cycles_used = cycles_requested - cycles;
+        return num_cycles_used as s32;
     }
 
     fn fetch_word(&mut self, cycles: &mut u32, memory: &Mem) -> Word {
@@ -194,7 +201,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lda_immediate_can_load_a_value_into_the_A_register() {
+    fn lda_immediate_can_load_a_value_into_the_a_register() {
         let mut mem: Mem = Mem::new();
         let mut cpu = CPU::new();
         cpu.reset(&mut mem);
@@ -204,9 +211,118 @@ mod tests {
         mem[0xFFFD] = 0x84;
 
         //when:
-        cpu.execute(2, &mut mem);
+        let cpu_copy = cpu.clone();
+        let cycles_used = cpu.execute(2, &mut mem);
 
         //then:
+        assert_eq!(cycles_used, 2);
         assert_eq!(cpu.a(), 0x84);
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 1);
+
+        assert_eq!(cpu.c(), cpu_copy.c());
+        assert_eq!(cpu.b(), cpu_copy.b());
+        assert_eq!(cpu.d(), cpu_copy.d());
+        assert_eq!(cpu.i(), cpu_copy.i());
+        assert_eq!(cpu.v(), cpu_copy.v());
     }
+
+    #[test]
+    fn lda_zero_page_can_load_a_value_into_the_a_register() {
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        mem[0xFFFC] = CPU::INS_LDA_ZP;
+        mem[0xFFFD] = 0x42;
+        mem[0x0042] = 0x37;
+
+        //when:
+        let cpu_copy = cpu.clone();
+        let cycles_used = cpu.execute(3, &mut mem);
+
+        //then:
+        assert_eq!(cycles_used, 3);
+
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        assert_eq!(cpu.c(), cpu_copy.c());
+        assert_eq!(cpu.b(), cpu_copy.b());
+        assert_eq!(cpu.d(), cpu_copy.d());
+        assert_eq!(cpu.i(), cpu_copy.i());
+        assert_eq!(cpu.v(), cpu_copy.v());
+   }
+
+    #[test]
+    fn lda_zero_page_x_can_load_a_value_into_the_a_register() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_x(5);
+
+
+        //start - inline a little program
+        mem[0xFFFC] = CPU::INS_LDA_ZPX;
+        mem[0xFFFD] = 0x42;
+        mem[0x0047] = 0x37;
+        //end - inline a little program
+
+        //when:
+        let cpu_copy = cpu.clone();
+        let cycles_used = cpu.execute(4, &mut mem);
+
+        //then:
+        assert_eq!(cycles_used, 4);
+
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        assert_eq!(cpu.c(), cpu_copy.c());
+        assert_eq!(cpu.b(), cpu_copy.b());
+        assert_eq!(cpu.d(), cpu_copy.d());
+        assert_eq!(cpu.i(), cpu_copy.i());
+        assert_eq!(cpu.v(), cpu_copy.v());
+   }
+
+    #[test]
+    fn lda_zero_page_x_can_load_a_value_into_the_a_register_when_it_wraps() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_x(0xFF);
+
+
+        //start - inline a little program
+        mem[0xFFFC] = CPU::INS_LDA_ZPX;
+        mem[0xFFFD] = 0x80;
+        mem[0x007F] = 0x37;
+        //end - inline a little program
+
+        //when:
+        let cpu_copy = cpu.clone();
+        let cycles_used = cpu.execute(4, &mut mem);
+
+        //then:
+        assert_eq!(cycles_used, 4);
+
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        assert_eq!(cpu.c(), cpu_copy.c());
+        assert_eq!(cpu.b(), cpu_copy.b());
+        assert_eq!(cpu.d(), cpu_copy.d());
+        assert_eq!(cpu.i(), cpu_copy.i());
+        assert_eq!(cpu.v(), cpu_copy.v());
+   }
 }
