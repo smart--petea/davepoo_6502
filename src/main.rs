@@ -1,14 +1,17 @@
-use davepoo_6502::{Mem, CPU};
+use davepoo_6502::{Mem, CPU, s32};
 
 fn main() {
+        //set up;
         let mut mem: Mem = Mem::new();
         let mut cpu = CPU::new();
         cpu.reset(&mut mem);
 
         //given:
-        mem[0xFFFC] = CPU::INS_LDA_IM;
-        mem[0xFFFD] = 0x84;
+        let NUM_CYCLES: s32 = 0;
 
         //when:
-        cpu.execute(2, &mut mem);
+        let cycles_used: s32 = cpu.execute(NUM_CYCLES, &mut mem);
+
+        //then:
+        assert_eq!(cycles_used, 0);
 }

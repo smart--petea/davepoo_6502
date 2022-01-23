@@ -1,9 +1,9 @@
 use modular_bitfield::*;
 use std::ops::{Index, IndexMut};
 
-type Byte = u8;
-type Word = u16;
-type s32 = i32;
+pub type Byte = u8;
+pub type Word = u16;
+pub type s32 = i32;
 
 const MAX_MEM: usize = 1024 * 64;
 pub struct Mem
@@ -31,7 +31,7 @@ impl Mem {
         &mut self,
         value: Word,
         address: u16,
-        cycles: &mut u32
+        cycles: &mut s32
     ) {
         let  address = address as usize;
         self.data[address] = (value & 0xFF) as Byte;
@@ -109,10 +109,10 @@ impl CPU {
     }
 
     //@return the number of cycles that were used
-    pub fn execute(&mut self, cycles: u32, memory: &mut Mem) -> s32 {
+    pub fn execute(&mut self, cycles: s32, memory: &mut Mem) -> s32 {
         let cycles_requested = cycles;
         let mut cycles = cycles;
-        while cycles > 0u32 {
+        while cycles > 0 {
             let ins: Byte = self.fetch_byte(&mut cycles, memory);
 
             match ins {
@@ -144,7 +144,7 @@ impl CPU {
                     cycles = cycles - 1;
                 }
                 _ => {
-                    unimplemented!("Instruction not handled {}", ins);
+                    println!("Instruction not handled {}", ins);
                 }
             }
         }
@@ -153,7 +153,11 @@ impl CPU {
         return num_cycles_used as s32;
     }
 
-    fn fetch_word(&mut self, cycles: &mut u32, memory: &Mem) -> Word {
+    fn fetch_word(
+        &mut self,
+        cycles: &mut s32,
+        memory: &Mem
+    ) -> Word {
         //6502 is little endian
         let mut data: Word = memory[self.pc()] as Word;
         self.set_pc(self.pc() + 1);
@@ -175,7 +179,11 @@ impl CPU {
         data
     }
 
-    fn fetch_byte(&mut self, cycles: &mut u32, memory: &Mem) -> Byte {
+    fn fetch_byte(
+        &mut self,
+        cycles: &mut s32,
+        memory: &Mem
+    ) -> Byte {
         let data: Byte = memory[self.pc()];
         self.set_pc(self.pc() + 1);
         *cycles = *cycles - 1;
@@ -185,7 +193,7 @@ impl CPU {
 
     fn read_byte(
         &mut self,
-        cycles: &mut u32,
+        cycles: &mut s32,
         address: Byte,
         memory: &Mem,
     ) -> Byte {
@@ -199,6 +207,16 @@ impl CPU {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    macro_rules! verify_unmodified_flags_from_lda {
+        ($cpu:ident, $cpu_copy: ident) => {
+            assert_eq!($cpu.c(), $cpu_copy.c());
+            assert_eq!($cpu.b(), $cpu_copy.b());
+            assert_eq!($cpu.d(), $cpu_copy.d());
+            assert_eq!($cpu.i(), $cpu_copy.i());
+            assert_eq!($cpu.v(), $cpu_copy.v());
+        };
+    }
 
     #[test]
     fn lda_immediate_can_load_a_value_into_the_a_register() {
@@ -225,6 +243,8 @@ mod tests {
         assert_eq!(cpu.d(), cpu_copy.d());
         assert_eq!(cpu.i(), cpu_copy.i());
         assert_eq!(cpu.v(), cpu_copy.v());
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
     }
 
     #[test]
@@ -249,11 +269,7 @@ mod tests {
         assert_eq!(cpu.z(), 0);
         assert_eq!(cpu.n(), 0);
 
-        assert_eq!(cpu.c(), cpu_copy.c());
-        assert_eq!(cpu.b(), cpu_copy.b());
-        assert_eq!(cpu.d(), cpu_copy.d());
-        assert_eq!(cpu.i(), cpu_copy.i());
-        assert_eq!(cpu.v(), cpu_copy.v());
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
    }
 
     #[test]
@@ -284,12 +300,61 @@ mod tests {
         assert_eq!(cpu.z(), 0);
         assert_eq!(cpu.n(), 0);
 
-        assert_eq!(cpu.c(), cpu_copy.c());
-        assert_eq!(cpu.b(), cpu_copy.b());
-        assert_eq!(cpu.d(), cpu_copy.d());
-        assert_eq!(cpu.i(), cpu_copy.i());
-        assert_eq!(cpu.v(), cpu_copy.v());
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
    }
+
+    #[test]
+    fn the_cpu_does_nothing_when_we_execute_zero_cycles() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        let num_cycles: s32 = 0;
+
+        //when:
+        let cycles_used: s32 = cpu.execute(num_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cycles_used, 0);
+    }
+
+    #[test]
+    fn executing_a_bad_instruction_does_not_put_us_in_an_infinite_loop () {
+        //set up;
+        let num_cycles = 2;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        mem[0xFFFC] = 0x00; //invalid instruction/opcode
+
+        //when:
+        let cycles_used: s32 = cpu.execute(num_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cycles_used, num_cycles);
+    }
+
+    #[test]
+    fn cpu_can_execute_more_cycles_than_requested_if_required_by_instructions () {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        mem[0xFFFC] = CPU::INS_LDA_IM;
+        mem[0xFFFD] = 0x84;
+
+        //when:
+        let cycles_used: s32 = cpu.execute(1, &mut mem);
+
+        //then:
+        assert_eq!(cycles_used, 2);
+    }
 
     #[test]
     fn lda_zero_page_x_can_load_a_value_into_the_a_register_when_it_wraps() {
@@ -319,10 +384,6 @@ mod tests {
         assert_eq!(cpu.z(), 0);
         assert_eq!(cpu.n(), 0);
 
-        assert_eq!(cpu.c(), cpu_copy.c());
-        assert_eq!(cpu.b(), cpu_copy.b());
-        assert_eq!(cpu.d(), cpu_copy.d());
-        assert_eq!(cpu.i(), cpu_copy.i());
-        assert_eq!(cpu.v(), cpu_copy.v());
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
    }
 }
