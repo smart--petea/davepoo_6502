@@ -58,20 +58,20 @@ impl IndexMut<u16> for Mem {
 #[bitfield]
 #[derive(Debug, Clone)]
 pub struct CPU {
-    pc: Word, //program counter
-    sp: Word, //stack pointer
+    pub pc: Word, //program counter
+    pub sp: Word, //stack pointer
 
     pub a: Byte, //registers
     pub x: Byte, //registers
     pub y: Byte, //registers
 
-    c: specifiers::B1, //status flag
-    z: specifiers::B1, //status flag
-    i: specifiers::B1, //status flag
-    d: specifiers::B1, //status flag
-    b: specifiers::B1, //status flag
-    v: specifiers::B1, //status flag
-    n: specifiers::B1, //status flag
+    pub c: specifiers::B1, //status flag
+    pub z: specifiers::B1, //status flag
+    pub i: specifiers::B1, //status flag
+    pub d: specifiers::B1, //status flag
+    pub b: specifiers::B1, //status flag
+    pub v: specifiers::B1, //status flag
+    pub n: specifiers::B1, //status flag
     n2_dummy: specifiers::B1, //status flag
 }
 
@@ -99,6 +99,11 @@ impl CPU {
     pub const INS_LDA_IM: Byte = 0xA9;
     pub const INS_LDA_ZP: Byte = 0xA5;
     pub const INS_LDA_ZPX: Byte = 0xB5;
+    pub const INS_LDA_ABS: Byte = 0xAD;
+    pub const INS_LDA_ABSX: Byte = 0xBD;
+    pub const INS_LDA_ABSY: Byte = 0xB9;
+    pub const INS_LDA_INDX: Byte = 0xA1; 
+    pub const INS_LDA_INDY: Byte = 0xB1; 
     pub const INS_JSR: Byte = 0x20;
 
     fn lda_set_status(&mut self) {
@@ -122,17 +127,35 @@ impl CPU {
                     self.lda_set_status();
                 }
                 Self::INS_LDA_ZP => {
-                    let zero_page_address: Byte = self.fetch_byte(&mut cycles, memory);
+                    let zero_page_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
                     let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
                     self.set_a(value);
                     self.lda_set_status();
                 }
                 Self::INS_LDA_ZPX => {
-                    let mut zero_page_address: Byte = self.fetch_byte(&mut cycles, memory);
-                    zero_page_address = ((zero_page_address as Word + self.x() as Word) & 0xFF) as Byte;
+                    let mut zero_page_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
+                    zero_page_address = (zero_page_address + self.x() as Word) & 0xFF;
                     cycles = cycles - 1;
 
                     let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
+                    self.set_a(value);
+                    self.lda_set_status();
+                }
+                Self::INS_LDA_ABS => {
+                    let abs_address: Word = self.fetch_word(&mut cycles, memory);
+                    let value: Byte = self.read_byte(&mut cycles, abs_address, memory);
+                    self.set_a(value);
+                    self.lda_set_status();
+                }
+                Self::INS_LDA_ABSX => {
+                    let mut abs_address: Word = self.fetch_word(&mut cycles, memory);
+                    abs_address += self.x() as Word;
+                    todo!();
+                    if (abs_address > 0xFF) {
+                        cycles = cycles - 1;
+                    }
+
+                    let value: Byte = self.read_byte(&mut cycles, abs_address, memory);
                     self.set_a(value);
                     self.lda_set_status();
                 }
@@ -194,10 +217,10 @@ impl CPU {
     fn read_byte(
         &mut self,
         cycles: &mut s32,
-        address: Byte,
+        address: Word,
         memory: &Mem,
     ) -> Byte {
-        let data: Byte = memory[address as u16];
+        let data: Byte = memory[address];
         *cycles = *cycles - 1;
 
         data
@@ -238,11 +261,28 @@ mod tests {
         assert_eq!(cpu.z(), 0);
         assert_eq!(cpu.n(), 1);
 
-        assert_eq!(cpu.c(), cpu_copy.c());
-        assert_eq!(cpu.b(), cpu_copy.b());
-        assert_eq!(cpu.d(), cpu_copy.d());
-        assert_eq!(cpu.i(), cpu_copy.i());
-        assert_eq!(cpu.v(), cpu_copy.v());
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+    }
+
+    #[test]
+    fn lda_immediate_can_affect_the_zero_flag() {
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_a(0x44);
+        mem[0xFFFC] = CPU::INS_LDA_IM;
+        mem[0xFFFD] = 0x0;
+
+        //when:
+        let cpu_copy = cpu.clone();
+        cpu.execute(2, &mut mem);
+
+        //then:
+        assert_eq!(cpu.a(), 0x0);
+        assert_eq!(cpu.z(), 1);
+        assert_eq!(cpu.n(), 0);
 
         verify_unmodified_flags_from_lda!(cpu, cpu_copy);
     }
@@ -386,4 +426,237 @@ mod tests {
 
         verify_unmodified_flags_from_lda!(cpu, cpu_copy);
    }
+
+    #[test]
+    fn lda_absolute_can_load_a_value_into_the_a_register() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        mem[0xFFFC] = CPU::INS_LDA_ABS;
+        mem[0xFFFD] = 0x80;
+        mem[0xFFFE] = 0x44; //0x4480
+        mem[0x4480] = 0x37; 
+        let expected_cycles = 4;
+        let cpu_copy = cpu.clone();
+
+        //when:
+        let cycles_used = cpu.execute(expected_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cycles_used, expected_cycles);
+        assert_eq!(cpu.a(), 0x37);
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+   }
+
+    #[test]
+    fn lda_absolute_x_can_load_a_value_into_the_a_register() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_x(0x01);
+        mem[0xFFFC] = CPU::INS_LDA_ABSX;
+        mem[0xFFFD] = 0x80;
+        mem[0xFFFE] = 0x44; //0x4480
+        mem[0x4481] = 0x37; 
+        let expected_cycles = 4;
+        let cpu_copy = cpu.clone();
+
+        //when:
+        let cycles_used = cpu.execute(expected_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cycles_used, expected_cycles);
+
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+   }
+
+    #[test]
+    fn lda_absolute_x_can_load_a_value_into_the_a_register_when_it_crosses_a_page_boundary() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_x(0xFF);
+        mem[0xFFFC] = CPU::INS_LDA_ABSX;
+        mem[0xFFFD] = 0x02;
+        mem[0xFFFE] = 0x44; //0x4402
+        mem[0x4501] = 0x37; //0x4402+0xFF crosses page boundary!
+        let expected_cycles = 5;
+        let cpu_copy = cpu.clone();
+
+        //when:
+        let cycles_used = cpu.execute(expected_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cycles_used, expected_cycles);
+
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+   }
+
+    /*
+    #[test]
+    fn lda_absolute_y_can_load_a_value_into_the_a_register() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_y(0xFF);
+        mem[0xFFFC] = CPU::INS_LDA_ABSY;
+        mem[0xFFFD] = 0x80;
+        mem[0xFFFE] = 0x44; //0x4480
+        mem[0x4480] = 0x37; 
+        let expected_cycles = 4;
+        let cpu_copy = cpu.clone();
+
+        //when:
+        let cycles_used = cpu.execute(expected_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cycles_used, expected_cycles);
+
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+   }
+
+    #[test]
+    fn lda_absolute_y_can_load_a_value_into_the_a_register_when_it_crosses_a_page_boundary() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_y(0xFF);
+        mem[0xFFFC] = CPU::INS_LDA_ABSY;
+        mem[0xFFFD] = 0x02;
+        mem[0xFFFE] = 0x44; //0x4402
+        mem[0x4501] = 0x37; //0x4402+0xFF crosses page boundary!
+        let expected_cycles = 5;
+        let cpu_copy = cpu.clone();
+
+        //when:
+        let cycles_used = cpu.execute(expected_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cycles_used, expected_cycles);
+
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+   }
+
+    #[test]
+    fn lda_indirect_x_can_load_a_value_into_the_a_register() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_x(0x04);
+        mem[0xFFFC] = CPU::INS_LDA_INDX;
+        mem[0xFFFD] = 0x02;
+        mem[0x0006] = 0x00; //0x2 + 0x4
+        mem[0x0007] = 0x80; 
+        mem[0x8000] = 0x37; 
+        let expected_cycles = 6;
+        let cpu_copy = cpu.clone();
+
+        //when:
+        let cycles_used = cpu.execute(expected_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cycles_used, expected_cycles);
+
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+   }
+
+    #[test]
+    fn lda_indirect_y_can_load_a_value_into_the_a_register() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_y(0x04);
+        mem[0xFFFC] = CPU::INS_LDA_INDY;
+        mem[0xFFFD] = 0x02;
+        mem[0x0002] = 0x00; 
+        mem[0x0003] = 0x80; 
+        mem[0x8004] = 0x37; //0x8000 + 0x4
+        let expected_cycles = 5;
+        let cpu_copy = cpu.clone();
+
+        //when:
+        let cycles_used = cpu.execute(expected_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cycles_used, expected_cycles);
+
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+   }
+
+    #[test]
+    fn lda_indirect_y_can_load_a_value_into_the_a_register_when_it_crosses_a_page() {
+        //set up;
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        cpu.set_y(0xFF);
+        mem[0xFFFC] = CPU::INS_LDA_INDY;
+        mem[0xFFFD] = 0x02;
+        mem[0x0002] = 0x02; 
+        mem[0x0003] = 0x80; 
+        mem[0x8101] = 0x37; //0x8002 + 0xFF
+        let expected_cycles = 6;
+        let cpu_copy = cpu.clone();
+
+        //when:
+        let cycles_used = cpu.execute(expected_cycles, &mut mem);
+
+        //then:
+        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(cycles_used, expected_cycles);
+
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+   }
+    */
 }
