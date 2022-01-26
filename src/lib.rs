@@ -98,6 +98,7 @@ pub mod m6502 {
         }
 
         //opcodes
+        //LDA
         pub const INS_LDA_IM: Byte = 0xA9;
         pub const INS_LDA_ZP: Byte = 0xA5;
         pub const INS_LDA_ZPX: Byte = 0xB5;
@@ -106,6 +107,17 @@ pub mod m6502 {
         pub const INS_LDA_ABSY: Byte = 0xB9;
         pub const INS_LDA_INDX: Byte = 0xA1; 
         pub const INS_LDA_INDY: Byte = 0xB1; 
+
+        //LDX
+        pub const INS_LDX_IM: Byte = 0xA2;
+        pub const INS_LDX_ZP: Byte = 0xA6;
+        pub const INS_LDX_ZPY: Byte = 0xB6;
+
+        //LDY
+        pub const INS_LDY_IM: Byte = 0xA0;
+        pub const INS_LDY_ZP: Byte = 0xA4;
+        pub const INS_LDY_ZPX: Byte = 0xB4;
+
         pub const INS_JSR: Byte = 0x20;
 
         fn lda_set_status(&mut self) {
@@ -281,14 +293,16 @@ mod tests {
         };
     }
 
-    #[test]
-    fn lda_immediate_can_load_a_value_into_the_a_register() {
+    fn test_load_register_immediate(
+            opcode_to_test: Byte,
+            register_to_test: fn (&CPU) -> Byte,
+        ) {
         let mut mem: Mem = Mem::new();
         let mut cpu = CPU::new();
         cpu.reset(&mut mem);
 
         //given:
-        mem[0xFFFC] = CPU::INS_LDA_IM;
+        mem[0xFFFC] = opcode_to_test;
         mem[0xFFFD] = 0x84;
 
         //when:
@@ -297,11 +311,53 @@ mod tests {
 
         //then:
         assert_eq!(cycles_used, 2);
-        assert_eq!(cpu.a(), 0x84);
+        assert_eq!(register_to_test(&cpu), 0x84);
         assert_eq!(cpu.z(), 0);
         assert_eq!(cpu.n(), 1);
 
         verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+    }
+
+    fn test_load_register_zero_page(
+        opcode_to_test: Byte,
+        register_to_test: fn (&CPU) -> Byte,
+    ) {
+        let mut mem: Mem = Mem::new();
+        let mut cpu = CPU::new();
+        cpu.reset(&mut mem);
+
+        //given:
+        mem[0xFFFC] = opcode_to_test;
+        mem[0xFFFD] = 0x42;
+        mem[0x0042] = 0x37;
+
+        //when:
+        let cpu_copy = cpu.clone();
+        let cycles_used = cpu.execute(3, &mut mem);
+
+        //then:
+        assert_eq!(cycles_used, 3);
+
+        assert_eq!(register_to_test(&cpu), 0x37);
+        assert_eq!(cpu.z(), 0);
+        assert_eq!(cpu.n(), 0);
+
+        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
+   }
+
+    #[test]
+    fn lda_immediate_can_load_a_value_into_the_a_register() {
+        test_load_register_immediate(CPU::INS_LDA_IM, CPU::a);
+    }
+
+    #[test]
+    fn ldx_immediate_can_load_a_value_into_the_x_register() {
+        test_load_register_immediate(CPU::INS_LDX_IM, CPU::x);
+    }
+
+    #[test]
+    fn ldy_immediate_can_load_a_value_into_the_y_register() {
+        test_load_register_immediate(CPU::INS_LDY_IM, CPU::x);
     }
 
     #[test]
@@ -329,31 +385,23 @@ mod tests {
 
     #[test]
     fn lda_zero_page_can_load_a_value_into_the_a_register() {
-        let mut mem: Mem = Mem::new();
-        let mut cpu = CPU::new();
-        cpu.reset(&mut mem);
-
-        //given:
-        mem[0xFFFC] = CPU::INS_LDA_ZP;
-        mem[0xFFFD] = 0x42;
-        mem[0x0042] = 0x37;
-
-        //when:
-        let cpu_copy = cpu.clone();
-        let cycles_used = cpu.execute(3, &mut mem);
-
-        //then:
-        assert_eq!(cycles_used, 3);
-
-        assert_eq!(cpu.a(), 0x37);
-        assert_eq!(cpu.z(), 0);
-        assert_eq!(cpu.n(), 0);
-
-        verify_unmodified_flags_from_lda!(cpu, cpu_copy);
-   }
+        test_load_register_zero_page(CPU::INS_LDA_ZP, CPU::a);
+    }
 
     #[test]
-    fn lda_zero_page_x_can_load_a_value_into_the_a_register() {
+    fn ldx_zero_page_can_load_a_value_into_the_x_register() {
+        test_load_register_zero_page(CPU::INS_LDX_ZP, CPU::x);
+    }
+
+    #[test]
+    fn ldy_zero_page_can_load_a_value_into_the_y_register() {
+        test_load_register_zero_page(CPU::INS_LDY_ZP, CPU::y);
+    }
+
+    fn test_load_register_zero_page_x(
+        opcode_to_test: Byte,
+        register_to_test: fn (&CPU) -> Byte,
+    ) {
         //set up;
         let mut mem: Mem = Mem::new();
         let mut cpu = CPU::new();
@@ -362,9 +410,8 @@ mod tests {
         //given:
         cpu.set_x(5);
 
-
         //start - inline a little program
-        mem[0xFFFC] = CPU::INS_LDA_ZPX;
+        mem[0xFFFC] = opcode_to_test;
         mem[0xFFFD] = 0x42;
         mem[0x0047] = 0x37;
         //end - inline a little program
@@ -376,12 +423,27 @@ mod tests {
         //then:
         assert_eq!(cycles_used, 4);
 
-        assert_eq!(cpu.a(), 0x37);
+        assert_eq!(register_to_test(&cpu), 0x37);
         assert_eq!(cpu.z(), 0);
         assert_eq!(cpu.n(), 0);
 
         verify_unmodified_flags_from_lda!(cpu, cpu_copy);
    }
+
+    #[test]
+    fn lda_zero_page_x_can_load_a_value_into_the_a_register() {
+        test_load_register_zero_page_x(CPU::INS_LDA_ZPX, CPU::a);
+    }
+
+    #[test]
+    fn ldx_zero_page_x_can_load_a_value_into_the_y_register() {
+        test_load_register_zero_page_y(CPU::INS_LDX_ZPY, CPU::y);
+    }
+
+    #[test]
+    fn ldy_zero_page_x_can_load_a_value_into_the_y_register() {
+        test_load_register_zero_page_x(CPU::INS_LDY_ZPX, CPU::y);
+    }
 
     #[test]
     fn the_cpu_does_nothing_when_we_execute_zero_cycles() {
