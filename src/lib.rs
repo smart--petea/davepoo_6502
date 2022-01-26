@@ -1,235 +1,275 @@
-use modular_bitfield::*;
-use std::ops::{Index, IndexMut};
 
-pub type Byte = u8;
-pub type Word = u16;
-pub type s32 = i32;
+pub mod m6502 {
+    use modular_bitfield::*;
+    use std::ops::{Index, IndexMut};
 
-const MAX_MEM: usize = 1024 * 64;
-pub struct Mem
-{
-    data: [Byte; MAX_MEM],
-}
+    pub type Byte = u8;
+    pub type Word = u16;
+    pub type s32 = i32;
 
-impl Mem {
-    pub fn new() -> Self {
-        Self {
-            data: [Byte::default(); MAX_MEM],
-        }
-    }
-
-    fn initialize(&mut self) {
-        for data in self.data.iter_mut() {
-            *data = Byte::default();
-        }
-    }
-}
-
-impl Mem {
-    /** write 2 bytes */
-    pub fn write_word(
-        &mut self,
-        value: Word,
-        address: u16,
-        cycles: &mut s32
-    ) {
-        let  address = address as usize;
-        self.data[address] = (value & 0xFF) as Byte;
-        self.data[address + 1] = (value >> 8) as Byte;
-
-        *cycles = *cycles - 2;
-    }
-}
-
-impl Index<u16> for Mem {
-    type Output=Byte;
-
-    fn index(&self, index: u16) -> &Byte {
-        &self.data[index as usize]
-    }
-}
-
-impl IndexMut<u16> for Mem {
-    fn index_mut(&mut self, index: u16) -> &mut Self::Output {
-        &mut self.data[index as usize]
-    }
-}
-
-#[bitfield]
-#[derive(Debug, Clone)]
-pub struct CPU {
-    pub pc: Word, //program counter
-    pub sp: Word, //stack pointer
-
-    pub a: Byte, //registers
-    pub x: Byte, //registers
-    pub y: Byte, //registers
-
-    pub c: specifiers::B1, //status flag
-    pub z: specifiers::B1, //status flag
-    pub i: specifiers::B1, //status flag
-    pub d: specifiers::B1, //status flag
-    pub b: specifiers::B1, //status flag
-    pub v: specifiers::B1, //status flag
-    pub n: specifiers::B1, //status flag
-    n2_dummy: specifiers::B1, //status flag
-}
-
-impl CPU {
-    pub fn reset(&mut self, memory: &mut Mem)
+    const MAX_MEM: usize = 1024 * 64;
+    pub struct Mem
     {
-        self.set_pc(0xFFFC);
-        self.set_sp(0x0100);
-        self.set_d(0);
-        self.set_a(0);
-        self.set_x(0);
-        self.set_y(0);
-
-        self.set_c(0);
-        self.set_z(0);
-        self.set_i(0);
-        self.set_b(0);
-        self.set_v(0);
-        self.set_n(0);
-
-        memory.initialize();
+        data: [Byte; MAX_MEM],
     }
 
-    //opcodes
-    pub const INS_LDA_IM: Byte = 0xA9;
-    pub const INS_LDA_ZP: Byte = 0xA5;
-    pub const INS_LDA_ZPX: Byte = 0xB5;
-    pub const INS_LDA_ABS: Byte = 0xAD;
-    pub const INS_LDA_ABSX: Byte = 0xBD;
-    pub const INS_LDA_ABSY: Byte = 0xB9;
-    pub const INS_LDA_INDX: Byte = 0xA1; 
-    pub const INS_LDA_INDY: Byte = 0xB1; 
-    pub const INS_JSR: Byte = 0x20;
-
-    fn lda_set_status(&mut self) {
-        let a = self.a();
-
-        self.set_z(if a == 0 {1} else {0});
-        self.set_n(if a & 0b10000000 == 0 {0} else {1});
-    }
-
-    //@return the number of cycles that were used
-    pub fn execute(&mut self, cycles: s32, memory: &mut Mem) -> s32 {
-        let cycles_requested = cycles;
-        let mut cycles = cycles;
-        while cycles > 0 {
-            let ins: Byte = self.fetch_byte(&mut cycles, memory);
-
-            match ins {
-                Self::INS_LDA_IM => {
-                    let value: Byte = self.fetch_byte(&mut cycles, memory);
-                    self.set_a(value);
-                    self.lda_set_status();
-                }
-                Self::INS_LDA_ZP => {
-                    let zero_page_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
-                    let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
-                    self.set_a(value);
-                    self.lda_set_status();
-                }
-                Self::INS_LDA_ZPX => {
-                    let mut zero_page_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
-                    zero_page_address = (zero_page_address + self.x() as Word) & 0xFF;
-                    cycles = cycles - 1;
-
-                    let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
-                    self.set_a(value);
-                    self.lda_set_status();
-                }
-                Self::INS_LDA_ABS => {
-                    let abs_address: Word = self.fetch_word(&mut cycles, memory);
-                    let value: Byte = self.read_byte(&mut cycles, abs_address, memory);
-                    self.set_a(value);
-                    self.lda_set_status();
-                }
-                Self::INS_LDA_ABSX => {
-                    let mut abs_address: Word = self.fetch_word(&mut cycles, memory);
-                    abs_address += self.x() as Word;
-                    todo!();
-                    if (abs_address > 0xFF) {
-                        cycles = cycles - 1;
-                    }
-
-                    let value: Byte = self.read_byte(&mut cycles, abs_address, memory);
-                    self.set_a(value);
-                    self.lda_set_status();
-                }
-                Self::INS_JSR => {
-                    let sub_addr: Word = self.fetch_word(&mut cycles, memory);
-                    memory.write_word(self.pc() - 1, self.sp(), &mut cycles);
-
-                    self.set_pc(sub_addr);
-                    cycles = cycles - 1;
-                }
-                _ => {
-                    println!("Instruction not handled {}", ins);
-                }
+    impl Mem {
+        pub fn new() -> Self {
+            Self {
+                data: [Byte::default(); MAX_MEM],
             }
         }
 
-        let num_cycles_used = cycles_requested - cycles;
-        return num_cycles_used as s32;
+        fn initialize(&mut self) {
+            for data in self.data.iter_mut() {
+                *data = Byte::default();
+            }
+        }
     }
 
-    fn fetch_word(
-        &mut self,
-        cycles: &mut s32,
-        memory: &Mem
-    ) -> Word {
-        //6502 is little endian
-        let mut data: Word = memory[self.pc()] as Word;
-        self.set_pc(self.pc() + 1);
+    impl Mem {
+        /** write 2 bytes */
+        pub fn write_word(
+            &mut self,
+            value: Word,
+            address: u16,
+            cycles: &mut s32
+        ) {
+            let  address = address as usize;
+            self.data[address] = (value & 0xFF) as Byte;
+            self.data[address + 1] = (value >> 8) as Byte;
 
-        let x = memory[self.pc()];
-        let y = x as Word;
-        let z = y << 8;
-        data = data | z;
-        //data = data | (( memory[self.pc()] as Word) << 8);
-        self.set_pc(self.pc() + 1);
-
-        *cycles = *cycles - 2;
-
-        //if you wanted to handle endianess
-        //you would have to swap bytes here
-        //if (PLATFORM_BIG_ENDIAN)
-        //  SwapBytesInWord()
-
-        data
+            *cycles = *cycles - 2;
+        }
     }
 
-    fn fetch_byte(
-        &mut self,
-        cycles: &mut s32,
-        memory: &Mem
-    ) -> Byte {
-        let data: Byte = memory[self.pc()];
-        self.set_pc(self.pc() + 1);
-        *cycles = *cycles - 1;
+    impl Index<u16> for Mem {
+        type Output=Byte;
 
-        data
+        fn index(&self, index: u16) -> &Byte {
+            &self.data[index as usize]
+        }
     }
 
-    fn read_byte(
-        &mut self,
-        cycles: &mut s32,
-        address: Word,
-        memory: &Mem,
-    ) -> Byte {
-        let data: Byte = memory[address];
-        *cycles = *cycles - 1;
+    impl IndexMut<u16> for Mem {
+        fn index_mut(&mut self, index: u16) -> &mut Self::Output {
+            &mut self.data[index as usize]
+        }
+    }
 
-        data
+    #[bitfield]
+    #[derive(Debug, Clone)]
+    pub struct CPU {
+        pub pc: Word, //program counter
+        pub sp: Word, //stack pointer
+
+        pub a: Byte, //registers
+        pub x: Byte, //registers
+        pub y: Byte, //registers
+
+        pub c: specifiers::B1, //status flag
+        pub z: specifiers::B1, //status flag
+        pub i: specifiers::B1, //status flag
+        pub d: specifiers::B1, //status flag
+        pub b: specifiers::B1, //status flag
+        pub v: specifiers::B1, //status flag
+        pub n: specifiers::B1, //status flag
+        n2_dummy: specifiers::B1, //status flag
+    }
+
+    impl CPU {
+        pub fn reset(&mut self, memory: &mut Mem)
+        {
+            self.set_pc(0xFFFC);
+            self.set_sp(0x0100);
+            self.set_d(0);
+            self.set_a(0);
+            self.set_x(0);
+            self.set_y(0);
+
+            self.set_c(0);
+            self.set_z(0);
+            self.set_i(0);
+            self.set_b(0);
+            self.set_v(0);
+            self.set_n(0);
+
+            memory.initialize();
+        }
+
+        //opcodes
+        pub const INS_LDA_IM: Byte = 0xA9;
+        pub const INS_LDA_ZP: Byte = 0xA5;
+        pub const INS_LDA_ZPX: Byte = 0xB5;
+        pub const INS_LDA_ABS: Byte = 0xAD;
+        pub const INS_LDA_ABSX: Byte = 0xBD;
+        pub const INS_LDA_ABSY: Byte = 0xB9;
+        pub const INS_LDA_INDX: Byte = 0xA1; 
+        pub const INS_LDA_INDY: Byte = 0xB1; 
+        pub const INS_JSR: Byte = 0x20;
+
+        fn lda_set_status(&mut self) {
+            let a = self.a();
+
+            self.set_z(if a == 0 {1} else {0});
+            self.set_n(if a & 0b10000000 == 0 {0} else {1});
+        }
+
+        //@return the number of cycles that were used
+        pub fn execute(&mut self, cycles: s32, memory: &mut Mem) -> s32 {
+            let cycles_requested = cycles;
+            let mut cycles = cycles;
+            while cycles > 0 {
+                let ins: Byte = self.fetch_byte(&mut cycles, memory);
+
+                match ins {
+                    Self::INS_LDA_IM => {
+                        let value: Byte = self.fetch_byte(&mut cycles, memory);
+                        self.set_a(value);
+                        self.lda_set_status();
+                    }
+                    Self::INS_LDA_ZP => {
+                        let zero_page_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
+                        let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
+                        self.set_a(value);
+                        self.lda_set_status();
+                    }
+                    Self::INS_LDA_ZPX => {
+                        let mut zero_page_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
+                        zero_page_address = (zero_page_address + self.x() as Word) & 0xFF;
+                        cycles = cycles - 1;
+
+                        let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
+                        self.set_a(value);
+                        self.lda_set_status();
+                    }
+                    Self::INS_LDA_ABS => {
+                        let abs_address: Word = self.fetch_word(&mut cycles, memory);
+                        let value: Byte = self.read_byte(&mut cycles, abs_address, memory);
+                        self.set_a(value);
+                    }
+                    Self::INS_LDA_ABSX => {
+                        let mut abs_address: Word = self.fetch_word(&mut cycles, memory);
+                        let abs_address_x = abs_address + self.x() as Word;
+                        let value: Byte = self.read_byte(&mut cycles, abs_address_x, memory);
+                        self.set_a(value);
+
+                        if abs_address_x - abs_address >= 0xFF {
+                            cycles = cycles - 1;
+                        }
+                    }
+                    Self::INS_LDA_ABSY => {
+                        let mut abs_address: Word = self.fetch_word(&mut cycles, memory);
+                        let abs_address_y = abs_address + self.y() as Word;
+                        let value: Byte = self.read_byte(&mut cycles, abs_address_y, memory);
+                        self.set_a(value);
+
+                        if abs_address_y - abs_address >= 0xFF {
+                            cycles = cycles - 1;
+                        }
+                    }
+                    Self::INS_LDA_INDX => {
+                        let mut zp_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
+                        zp_address = zp_address + self.x() as Word;
+                        cycles = cycles - 1;
+                        let effective_address: Word = self.read_word(&mut cycles, zp_address, memory);
+                        let value: Byte = self.read_byte(&mut cycles, effective_address, memory);
+                        self.set_a(value);
+                    }
+                    Self::INS_LDA_INDY => {
+                        let mut zp_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
+                        let effective_address: Word = self.read_word(&mut cycles, zp_address, memory);
+                        let effective_address_y = effective_address + self.y() as Word;
+                        let value: Byte = self.read_byte(&mut cycles, effective_address_y, memory);
+                        self.set_a(value);
+                        if effective_address_y - effective_address >= 0xFF {
+                            cycles = cycles - 1;
+                        }
+                    }
+                    Self::INS_JSR => {
+                        let sub_addr: Word = self.fetch_word(&mut cycles, memory);
+                        memory.write_word(self.pc() - 1, self.sp(), &mut cycles);
+
+                        self.set_pc(sub_addr);
+                        cycles = cycles - 1;
+                    }
+                    _ => {
+                        println!("Instruction not handled {}", ins);
+                    }
+                }
+            }
+
+            let num_cycles_used = cycles_requested - cycles;
+            return num_cycles_used as s32;
+        }
+
+        fn fetch_word(
+            &mut self,
+            cycles: &mut s32,
+            memory: &Mem
+        ) -> Word {
+            //6502 is little endian
+            let mut data: Word = memory[self.pc()] as Word;
+            self.set_pc(self.pc() + 1);
+
+            let x = memory[self.pc()];
+            let y = x as Word;
+            let z = y << 8;
+            data = data | z;
+            //data = data | (( memory[self.pc()] as Word) << 8);
+            self.set_pc(self.pc() + 1);
+
+            *cycles = *cycles - 2;
+
+            //if you wanted to handle endianess
+            //you would have to swap bytes here
+            //if (PLATFORM_BIG_ENDIAN)
+            //  SwapBytesInWord()
+
+            data
+        }
+
+        fn fetch_byte(
+            &mut self,
+            cycles: &mut s32,
+            memory: &Mem
+        ) -> Byte {
+            let data: Byte = memory[self.pc()];
+            self.set_pc(self.pc() + 1);
+            *cycles = *cycles - 1;
+
+            data
+        }
+
+        fn read_byte(
+            &mut self,
+            cycles: &mut s32,
+            address: Word,
+            memory: &Mem,
+        ) -> Byte {
+            let data: Byte = memory[address];
+            *cycles = *cycles - 1;
+
+            data
+        }
+
+        fn read_word(
+            &mut self,
+            cycles: &mut s32,
+            address: Word,
+            memory: &Mem,
+        ) -> Word {
+            let lo_byte = self.read_byte(cycles, address, memory) as Word;
+            let hi_byte = self.read_byte(cycles, address + 1, memory) as Word;
+
+            lo_byte | (hi_byte << 8)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::m6502::*;
 
     macro_rules! verify_unmodified_flags_from_lda {
         ($cpu:ident, $cpu_copy: ident) => {
@@ -358,24 +398,6 @@ mod tests {
 
         //then:
         assert_eq!(cycles_used, 0);
-    }
-
-    #[test]
-    fn executing_a_bad_instruction_does_not_put_us_in_an_infinite_loop () {
-        //set up;
-        let num_cycles = 2;
-        let mut mem: Mem = Mem::new();
-        let mut cpu = CPU::new();
-        cpu.reset(&mut mem);
-
-        //given:
-        mem[0xFFFC] = 0x00; //invalid instruction/opcode
-
-        //when:
-        let cycles_used: s32 = cpu.execute(num_cycles, &mut mem);
-
-        //then:
-        assert_eq!(cycles_used, num_cycles);
     }
 
     #[test]
@@ -510,7 +532,6 @@ mod tests {
         verify_unmodified_flags_from_lda!(cpu, cpu_copy);
    }
 
-    /*
     #[test]
     fn lda_absolute_y_can_load_a_value_into_the_a_register() {
         //set up;
@@ -519,11 +540,11 @@ mod tests {
         cpu.reset(&mut mem);
 
         //given:
-        cpu.set_y(0xFF);
+        cpu.set_y(0x01);
         mem[0xFFFC] = CPU::INS_LDA_ABSY;
         mem[0xFFFD] = 0x80;
         mem[0xFFFE] = 0x44; //0x4480
-        mem[0x4480] = 0x37; 
+        mem[0x4481] = 0x37; 
         let expected_cycles = 4;
         let cpu_copy = cpu.clone();
 
@@ -658,5 +679,4 @@ mod tests {
 
         verify_unmodified_flags_from_lda!(cpu, cpu_copy);
    }
-    */
 }

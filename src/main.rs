@@ -1,4 +1,4 @@
-use davepoo_6502::{Mem, CPU, s32};
+use davepoo_6502::m6502::{Mem, CPU, s32};
 
 fn main() {
     /*
