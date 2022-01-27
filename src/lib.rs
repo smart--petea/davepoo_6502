@@ -124,7 +124,7 @@ pub mod m6502 {
 
         pub const INS_JSR: Byte = 0x20;
 
-        fn lda_set_status(&mut self) {
+        fn load_register_set_status(&mut self) {
             let a = self.a();
 
             self.set_z(if a == 0 {1} else {0});
@@ -142,13 +142,26 @@ pub mod m6502 {
                     Self::INS_LDA_IM => {
                         let value: Byte = self.fetch_byte(&mut cycles, memory);
                         self.set_a(value);
-                        self.lda_set_status();
+
+                        self.load_register_set_status();
+                    }
+                    Self::INS_LDX_IM => {
+                        let value: Byte = self.fetch_byte(&mut cycles, memory);
+                        self.set_x(value);
+
+                        self.load_register_set_status();
+                    }
+                    Self::INS_LDY_IM => {
+                        let value: Byte = self.fetch_byte(&mut cycles, memory);
+                        self.set_y(value);
+
+                        self.load_register_set_status();
                     }
                     Self::INS_LDA_ZP => {
                         let zero_page_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
                         let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
                         self.set_a(value);
-                        self.lda_set_status();
+                        self.load_register_set_status();
                     }
                     Self::INS_LDA_ZPX => {
                         let mut zero_page_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
@@ -157,7 +170,7 @@ pub mod m6502 {
 
                         let value: Byte = self.read_byte(&mut cycles, zero_page_address, memory);
                         self.set_a(value);
-                        self.lda_set_status();
+                        self.load_register_set_status();
                     }
                     Self::INS_LDA_ABS => {
                         let abs_address: Word = self.fetch_word(&mut cycles, memory);
@@ -361,7 +374,7 @@ mod tests {
 
     #[test]
     fn ldy_immediate_can_load_a_value_into_the_y_register() {
-        test_load_register_immediate(CPU::INS_LDY_IM, CPU::x);
+        test_load_register_immediate(CPU::INS_LDY_IM, CPU::y);
     }
 
     #[test]
