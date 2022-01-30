@@ -134,7 +134,26 @@ pub mod m6502 {
         pub const INS_LDY_ABS: Byte = 0xAC;
         pub const INS_LDY_ABSX: Byte = 0xBC;
 
+        //L
         pub const INS_JSR: Byte = 0x20;
+
+        //STA
+        pub const INS_STA_ZP: Byte = 0x85;
+        pub const INS_STA_ZPX: Byte = 0x95;
+        pub const INS_STA_ABS: Byte = 0x8D;
+        pub const INS_STX_ABSX: Byte = 0x9D;
+        pub const INS_STX_ABSY: Byte = 0x99;
+        pub const INS_STX_INDX: Byte = 0x81;
+        pub const INS_STX_INDY: Byte = 0x91;
+
+        //STX
+        pub const INS_STX_ZP: Byte = 0x86;
+        pub const INS_STX_ABS: Byte = 0x8E;
+
+        //STY
+        pub const INS_STY_ZP: Byte = 0x84;
+        pub const INS_STY_ZPX: Byte = 0x94;
+        pub const INS_STY_ABS: Byte = 0x8C;
 
 
         /**Sets the correct Process status after a load register instruction
