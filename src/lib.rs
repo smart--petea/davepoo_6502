@@ -78,6 +78,18 @@ pub mod m6502 {
     }
 
     impl CPU {
+        fn load_register(
+            &mut self,
+            address: Word,
+            register_setter: fn(&mut CPU, u8),
+            memory: &Mem,
+            cycles: &mut s32,
+        ) {
+            let value: Byte = self.read_byte(cycles, address, memory);
+            register_setter(self, value);
+            self.load_register_set_status(value);
+        }
+
         pub fn reset(&mut self, memory: &mut Mem)
         {
             self.set_pc(0xFFFC);
@@ -123,6 +135,7 @@ pub mod m6502 {
         pub const INS_LDY_ABSX: Byte = 0xBC;
 
         pub const INS_JSR: Byte = 0x20;
+
 
         /**Sets the correct Process status after a load register instruction
          * - LDA, LDY, LDZ
@@ -198,13 +211,11 @@ pub mod m6502 {
                     Self::INS_LDA_IM => {
                         let value: Byte = self.fetch_byte(&mut cycles, memory);
                         self.set_a(value);
-
                         self.load_register_set_status(value);
                     }
                     Self::INS_LDX_IM => {
                         let value: Byte = self.fetch_byte(&mut cycles, memory);
                         self.set_x(value);
-
                         self.load_register_set_status(value);
                     }
                     Self::INS_LDY_IM => {
@@ -215,109 +226,73 @@ pub mod m6502 {
                     }
                     Self::INS_LDY_ZP => {
                         let address = self.addr_zero_page(&mut cycles, memory);
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_y(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_y, memory, &mut cycles);
                     }
                     Self::INS_LDX_ZP => {
                         let address = self.addr_zero_page(&mut cycles, memory);
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_x(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_x, memory, &mut cycles);
                     }
                     Self::INS_LDX_ZPY => {
                         let address = self.addr_zero_page_y(&mut cycles, memory);
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_x(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_x, memory, &mut cycles);
                     }
                     Self::INS_LDA_ZP => {
                         let address = self.addr_zero_page(&mut cycles, memory);
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_a(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_a, memory, &mut cycles);
                     }
                     Self::INS_LDY_ZPX => {
                         let mut address: Word = self.addr_zero_page_x(&mut cycles, memory);
-
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_y(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_y, memory, &mut cycles);
                     }
                     Self::INS_LDA_ZPX => {
                         let mut address: Word = self.addr_zero_page_x(&mut cycles, memory);
-
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_a(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_a, memory, &mut cycles);
                     }
                     Self::INS_LDA_ABS => {
                         let address = self.addr_absolute(&mut cycles, memory);
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_a(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_a, memory, &mut cycles);
                     }
                     Self::INS_LDX_ABS => {
                         let address = self.addr_absolute(&mut cycles, memory);
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_x(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_x, memory, &mut cycles);
                     }
                     Self::INS_LDY_ABS => {
                         let address = self.addr_absolute(&mut cycles, memory);
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_y(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_y, memory, &mut cycles);
                     }
                     Self::INS_LDA_ABSX => {
                         let address = self.addr_absolute_x(&mut cycles, memory);
-
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_a(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_a, memory, &mut cycles);
                     }
                     Self::INS_LDY_ABSX => {
                         let address = self.addr_absolute_x(&mut cycles, memory);
-
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_y(value);
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_y, memory, &mut cycles);
                     }
                     Self::INS_LDA_ABSY => {
-
                         let address = self.addr_absolute_y(&mut cycles, memory);
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_a(value);
-
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_a, memory, &mut cycles);
                     }
                     Self::INS_LDX_ABSY => {
-
                         let address = self.addr_absolute_y(&mut cycles, memory);
-                        let value: Byte = self.read_byte(&mut cycles, address, memory);
-                        self.set_x(value);
-
-                        self.load_register_set_status(value);
+                        self.load_register(address, CPU::set_x, memory, &mut cycles);
                     }
                     Self::INS_LDA_INDX => {
                         let mut zp_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
                         zp_address = zp_address + self.x() as Word;
                         cycles = cycles - 1;
                         let effective_address: Word = self.read_word(&mut cycles, zp_address, memory);
-                        let value: Byte = self.read_byte(&mut cycles, effective_address, memory);
-                        self.set_a(value);
-                        self.load_register_set_status(value);
+
+                        self.load_register(effective_address, CPU::set_a, memory, &mut cycles);
                     }
                     Self::INS_LDA_INDY => {
                         let mut zp_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
                         let effective_address: Word = self.read_word(&mut cycles, zp_address, memory);
                         let effective_address_y = effective_address + self.y() as Word;
-                        let value: Byte = self.read_byte(&mut cycles, effective_address_y, memory);
-                        self.set_a(value);
                         if effective_address_y - effective_address >= 0xFF {
                             cycles = cycles - 1;
                         }
-                        self.load_register_set_status(value);
+
+                        self.load_register(effective_address_y, CPU::set_a, memory, &mut cycles);
                     }
                     Self::INS_JSR => {
                         let sub_addr: Word = self.fetch_word(&mut cycles, memory);
@@ -401,7 +376,7 @@ pub mod m6502 {
 }
 
 #[cfg(test)]
-mod tests {
+mod load_register_tests {
     use super::m6502::*;
 
     macro_rules! verify_unmodified_flags_from_load_register {
