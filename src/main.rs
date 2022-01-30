@@ -1,37 +1,29 @@
-use davepoo_6502::m6502::{Mem, CPU, s32};
+use davepoo_6502::m6502;
 
 fn main() {
-    /*
-        //set up;
-        let mut mem: Mem = Mem::new();
-        let mut cpu = CPU::new();
-        cpu.reset(&mut mem);
+    test_load_register_immediate(m6502::CPU::INS_LDX_IM, m6502::CPU::x);
+}
 
-        //given:
-        cpu.set_x(0xFF);
-        mem[0xFFFC] = CPU::INS_LDA_ABSX;
-        mem[0xFFFD] = 0x02;
-        mem[0xFFFE] = 0x44; //0x4402
-        mem[0x4501] = 0x37; //0x4402+0xFF crosses page boundary!
-        let expected_cycles = 5;
+fn test_load_register_immediate(
+    opcode_to_test: m6502::Byte,
+    register_to_test: fn (&m6502::CPU) -> m6502::Byte,
+) {
+    let mut mem: m6502::Mem = m6502::Mem::new();
+    let mut cpu = m6502::CPU::new();
+    cpu.reset(&mut mem);
 
-        //when:
-        let cycles_used = cpu.execute(expected_cycles, &mut mem);
-    */
+    //given:
+    mem[0xFFFC] = opcode_to_test;
+    mem[0xFFFD] = 0x84;
 
-        let mut mem: Mem = Mem::new();
-        let mut cpu = CPU::new();
-        cpu.reset(&mut mem);
+    //when:
+    let cpu_copy = cpu.clone();
+    let cycles_used = cpu.execute(2, &mut mem);
 
-        //given:
-        cpu.set_x(0x01);
-        mem[0xFFFC] = CPU::INS_LDA_ABSX;
-        mem[0xFFFD] = 0x80;
-        mem[0xFFFE] = 0x44; //0x4480
-        mem[0x4481] = 0x37; 
-        let expected_cycles = 4;
-        let cpu_copy = cpu.clone();
+    //then:
+    assert_eq!(cycles_used, 2);
+    assert_eq!(register_to_test(&cpu), 0x84);
+    assert_eq!(cpu.z(), 0);
+    assert_eq!(cpu.n(), 1);
 
-        //when:
-        let cycles_used = cpu.execute(expected_cycles, &mut mem);
 }
