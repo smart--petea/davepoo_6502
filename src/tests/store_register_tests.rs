@@ -31,7 +31,7 @@ fn test_store_register_zero_page(
     let actual_cycles = cpu.execute(EXPECTED_CYCLES, &mut mem);
 
     //then:
-    assert_eq!(actual_cycles, actual_cycles);
+    assert_eq!(actual_cycles, EXPECTED_CYCLES);
     assert_eq!(mem[0x0080], 0x2F);
     verify_unmodified_flags_from_load_register!(cpu, cpu_copy);
 }
@@ -137,7 +137,7 @@ fn sta_absolute_x_can_store_the_register_into_memory() {
     //given:
     cpu.set_x(0x0F);
     cpu.set_a(0x42);
-    mem[0xFFFC] = CPU::INS_STX_ABSX;
+    mem[0xFFFC] = CPU::INS_STA_ABSX;
     mem[0xFFFD] = 0x00;
     mem[0xFFFE] = 0x80;
     mem[0x008F] = 0x00;
@@ -162,7 +162,7 @@ fn sta_absolute_y_can_store_the_register_into_memory() {
     //given:
     cpu.set_y(0x0F);
     cpu.set_a(0x42);
-    mem[0xFFFC] = CPU::INS_STX_ABSY;
+    mem[0xFFFC] = CPU::INS_STA_ABSY;
     mem[0xFFFD] = 0x00;
     mem[0xFFFE] = 0x80;
     mem[0x008F] = 0x00;

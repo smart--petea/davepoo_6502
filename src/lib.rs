@@ -141,8 +141,8 @@ pub mod m6502 {
         pub const INS_STA_ZP: Byte = 0x85;
         pub const INS_STA_ZPX: Byte = 0x95;
         pub const INS_STA_ABS: Byte = 0x8D;
-        pub const INS_STX_ABSX: Byte = 0x9D;
-        pub const INS_STX_ABSY: Byte = 0x99;
+        pub const INS_STA_ABSX: Byte = 0x9D;
+        pub const INS_STA_ABSY: Byte = 0x99;
         pub const INS_STX_INDX: Byte = 0x81;
         pub const INS_STX_INDY: Byte = 0x91;
 
@@ -313,6 +313,51 @@ pub mod m6502 {
 
                         self.load_register(effective_address_y, CPU::set_a, memory, &mut cycles);
                     }
+                    Self::INS_STA_ZP => {
+                        let address = self.addr_zero_page(&mut cycles, memory);
+                        self.write_byte(self.a(), &mut cycles, address, memory);
+
+                    }
+                    Self::INS_STX_ZP => {
+                        let address = self.addr_zero_page(&mut cycles, memory);
+                        self.write_byte(self.x(), &mut cycles, address, memory);
+
+                    }
+                    Self::INS_STY_ZP => {
+                        let address = self.addr_zero_page(&mut cycles, memory);
+                        self.write_byte(self.y(), &mut cycles, address, memory);
+
+                    }
+                    Self::INS_STA_ABS => {
+                        let address = self.addr_absolute(&mut cycles, memory);
+                        self.write_byte(self.a(), &mut cycles, address, memory);
+
+                    }
+                    Self::INS_STX_ABS => {
+                        let address = self.addr_absolute(&mut cycles, memory);
+                        self.write_byte(self.x(), &mut cycles, address, memory);
+
+                    }
+                    Self::INS_STY_ABS => {
+                        let address = self.addr_absolute(&mut cycles, memory);
+                        self.write_byte(self.y(), &mut cycles, address, memory);
+
+                    }
+                    Self::INS_STA_ZPX => {
+                        let address = self.addr_zero_page_x(&mut cycles, memory);
+                        self.write_byte(self.a(), &mut cycles, address, memory);
+
+                    }
+                    Self::INS_STY_ZPX => {
+                        let address = self.addr_zero_page_x(&mut cycles, memory);
+                        self.write_byte(self.y(), &mut cycles, address, memory);
+
+                    }
+                    Self::INS_STA_ABSX => {
+                        let address = self.addr_absolute_x(&mut cycles, memory);
+                        self.write_byte(self.a(), &mut cycles, address, memory);
+
+                    }
                     Self::INS_JSR => {
                         let sub_addr: Word = self.fetch_word(&mut cycles, memory);
                         memory.write_word(self.pc() - 1, self.sp(), &mut cycles);
@@ -390,6 +435,17 @@ pub mod m6502 {
             let hi_byte = self.read_byte(cycles, address + 1, memory) as Word;
 
             lo_byte | (hi_byte << 8)
+        }
+
+        fn write_byte(
+            &self,
+            value: Byte,
+            cycles: &mut s32,
+            address: Word,
+            memory: &mut Mem,
+        ) {
+            memory[address] = value;
+            *cycles = *cycles - 1;
         }
     }
 }
