@@ -28,19 +28,6 @@ pub mod m6502 {
     }
 
     impl Mem {
-        /** write 2 bytes */
-        pub fn write_word(
-            &mut self,
-            value: Word,
-            address: u16,
-            cycles: &mut s32
-        ) {
-            let  address = address as usize;
-            self.data[address] = (value & 0xFF) as Byte;
-            self.data[address + 1] = (value >> 8) as Byte;
-
-            *cycles = *cycles - 2;
-        }
     }
 
     impl Index<u16> for Mem {
@@ -390,7 +377,7 @@ pub mod m6502 {
                     }
                     Self::INS_JSR => {
                         let sub_addr: Word = self.fetch_word(&mut cycles, memory);
-                        memory.write_word(self.pc() - 1, self.sp(), &mut cycles);
+                        self.write_word( self.sp(), &mut cycles, self.pc() - 1, memory,);
 
                         self.set_pc(sub_addr);
                         cycles = cycles - 1;
@@ -411,24 +398,12 @@ pub mod m6502 {
             memory: &Mem
         ) -> Word {
             //6502 is little endian
-            let mut data: Word = memory[self.pc()] as Word;
-            self.set_pc(self.pc() + 1);
+            let pc = self.pc();
 
-            let x = memory[self.pc()];
-            let y = x as Word;
-            let z = y << 8;
-            data = data | z;
-            //data = data | (( memory[self.pc()] as Word) << 8);
-            self.set_pc(self.pc() + 1);
-
+            self.set_pc(pc + 2);
             *cycles = *cycles - 2;
 
-            //if you wanted to handle endianess
-            //you would have to swap bytes here
-            //if (PLATFORM_BIG_ENDIAN)
-            //  SwapBytesInWord()
-
-            data
+            u16::from_le_bytes([memory[pc], memory[pc + 1]])
         }
 
         fn fetch_byte(
@@ -467,6 +442,7 @@ pub mod m6502 {
             lo_byte | (hi_byte << 8)
         }
 
+        /** write 1 byte to memory */
         fn write_byte(
             &self,
             value: Byte,
@@ -476,6 +452,20 @@ pub mod m6502 {
         ) {
             memory[address] = value;
             *cycles = *cycles - 1;
+        }
+
+        /** write 2 bytes to memory */
+        pub fn write_word(
+            &mut self,
+            value: Word,
+            cycles: &mut s32,
+            address: Word,
+            memory: &mut Mem,
+        ) {
+            memory[address] = (value & 0xFF) as Byte;
+            memory[address + 1] = (value >> 8) as Byte;
+
+            *cycles = *cycles - 2;
         }
     }
 }
