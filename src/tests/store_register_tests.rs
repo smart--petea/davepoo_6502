@@ -140,7 +140,7 @@ fn sta_absolute_x_can_store_the_register_into_memory() {
     mem[0xFFFC] = CPU::INS_STA_ABSX;
     mem[0xFFFD] = 0x00;
     mem[0xFFFE] = 0x80;
-    mem[0x008F] = 0x00;
+    mem[0x800F] = 0x00;
     const EXPECTED_CYCLES: s32 = 5;
     let cpu_copy = cpu.clone();
 
@@ -149,7 +149,7 @@ fn sta_absolute_x_can_store_the_register_into_memory() {
 
     //then:
     assert_eq!(actual_cycles, actual_cycles);
-    assert_eq!(mem[0x008F], 0x42);
+    assert_eq!(mem[0x800F], 0x42);
     verify_unmodified_flags_from_load_register!(cpu, cpu_copy);
 }
 
@@ -165,7 +165,7 @@ fn sta_absolute_y_can_store_the_register_into_memory() {
     mem[0xFFFC] = CPU::INS_STA_ABSY;
     mem[0xFFFD] = 0x00;
     mem[0xFFFE] = 0x80;
-    mem[0x008F] = 0x00;
+    mem[0x800F] = 0x00;
     const EXPECTED_CYCLES: s32 = 5;
     let cpu_copy = cpu.clone();
 
@@ -174,7 +174,7 @@ fn sta_absolute_y_can_store_the_register_into_memory() {
 
     //then:
     assert_eq!(actual_cycles, actual_cycles);
-    assert_eq!(mem[0x008F], 0x42);
+    assert_eq!(mem[0x800F], 0x42);
     verify_unmodified_flags_from_load_register!(cpu, cpu_copy);
 }
 
@@ -187,7 +187,7 @@ fn sta_indirect_x_can_store_the_register_into_memory() {
     //given:
     cpu.set_x(0x0F);
     cpu.set_a(0x42);
-    mem[0xFFFC] = CPU::INS_STX_INDX;
+    mem[0xFFFC] = CPU::INS_STA_INDX;
     mem[0xFFFD] = 0x20;
     mem[0x002F] = 0x00;
     mem[0x0030] = 0x80;
@@ -213,7 +213,7 @@ fn sta_indirect_y_can_store_the_register_into_memory() {
     //given:
     cpu.set_y(0x0F);
     cpu.set_a(0x42);
-    mem[0xFFFC] = CPU::INS_STX_INDY;
+    mem[0xFFFC] = CPU::INS_STA_INDY;
     mem[0xFFFD] = 0x20;
     mem[0x0020] = 0x00;
     mem[0x0021] = 0x80;

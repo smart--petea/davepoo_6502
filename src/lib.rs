@@ -143,8 +143,8 @@ pub mod m6502 {
         pub const INS_STA_ABS: Byte = 0x8D;
         pub const INS_STA_ABSX: Byte = 0x9D;
         pub const INS_STA_ABSY: Byte = 0x99;
-        pub const INS_STX_INDX: Byte = 0x81;
-        pub const INS_STX_INDY: Byte = 0x91;
+        pub const INS_STA_INDX: Byte = 0x81;
+        pub const INS_STA_INDY: Byte = 0x91;
 
         //STX
         pub const INS_STX_ZP: Byte = 0x86;
@@ -208,6 +208,15 @@ pub mod m6502 {
             abs_address_x
         }
 
+        /** Addressing mode - Indirect X | Indexed Indirect */
+        fn addr_indirect_x(&mut self, cycles: &mut s32, memory: &Mem) -> Word {
+            let mut zp_address: Word = self.fetch_byte(cycles, memory) as Word;
+            zp_address = zp_address + self.x() as Word;
+            *cycles = *cycles - 1;
+            let effective_address: Word = self.read_word(cycles, zp_address, memory);
+            effective_address
+        }
+
         /** Addressing mode - Absolute with Y offset*/
         fn addr_absolute_y(&mut self, cycles: &mut s32, memory: &Mem) -> Word {
             let mut abs_address: Word = self.fetch_word(cycles, memory);
@@ -218,6 +227,19 @@ pub mod m6502 {
 
             abs_address_y
         }
+
+        /** Addressing mode - Indirect Y | Indirect Indexed */
+        fn addr_indirect_y(&mut self, cycles: &mut s32, memory: &Mem) -> Word {
+            let mut zp_address: Word = self.fetch_byte(cycles, memory) as Word;
+            let effective_address: Word = self.read_word(cycles, zp_address, memory);
+            let effective_address_y = effective_address + self.y() as Word;
+            if effective_address_y - effective_address >= 0xFF {
+                *cycles = *cycles - 1;
+            }
+
+            effective_address_y
+        }
+
 
         //@return the number of cycles that were used
         pub fn execute(&mut self, cycles: s32, memory: &mut Mem) -> s32 {
@@ -296,22 +318,21 @@ pub mod m6502 {
                         self.load_register(address, CPU::set_x, memory, &mut cycles);
                     }
                     Self::INS_LDA_INDX => {
-                        let mut zp_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
-                        zp_address = zp_address + self.x() as Word;
-                        cycles = cycles - 1;
-                        let effective_address: Word = self.read_word(&mut cycles, zp_address, memory);
+                        let effective_address: Word = self.addr_indirect_x(&mut cycles, memory);
 
                         self.load_register(effective_address, CPU::set_a, memory, &mut cycles);
                     }
+                    Self::INS_STA_INDX => {
+                        let effective_address: Word = self.addr_indirect_x(&mut cycles, memory);
+                        self.write_byte(self.a(), &mut cycles, effective_address, memory)
+                    }
                     Self::INS_LDA_INDY => {
-                        let mut zp_address: Word = self.fetch_byte(&mut cycles, memory) as Word;
-                        let effective_address: Word = self.read_word(&mut cycles, zp_address, memory);
-                        let effective_address_y = effective_address + self.y() as Word;
-                        if effective_address_y - effective_address >= 0xFF {
-                            cycles = cycles - 1;
-                        }
-
+                        let effective_address_y = self.addr_indirect_y(&mut cycles, memory);
                         self.load_register(effective_address_y, CPU::set_a, memory, &mut cycles);
+                    }
+                    Self::INS_STA_INDY => {
+                        let effective_address_y = self.addr_indirect_y(&mut cycles, memory);
+                        self.write_byte(self.a(), &mut cycles, effective_address_y, memory);
                     }
                     Self::INS_STA_ZP => {
                         let address = self.addr_zero_page(&mut cycles, memory);
@@ -354,9 +375,18 @@ pub mod m6502 {
 
                     }
                     Self::INS_STA_ABSX => {
+                        //TODO: AddAbsoluteX can consume an extra cycle on boundaries?
                         let address = self.addr_absolute_x(&mut cycles, memory);
                         self.write_byte(self.a(), &mut cycles, address, memory);
 
+                        cycles = cycles - 1; //todo why the extra cycle is consumed
+                    }
+                    Self::INS_STA_ABSY => {
+                        //TODO: AddAbsoluteY can consume an extra cycle on boundaries?
+                        let address = self.addr_absolute_y(&mut cycles, memory);
+                        self.write_byte(self.a(), &mut cycles, address, memory);
+
+                        cycles = cycles - 1; //todo why the extra cycle is consumed
                     }
                     Self::INS_JSR => {
                         let sub_addr: Word = self.fetch_word(&mut cycles, memory);
