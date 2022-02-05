@@ -17,7 +17,7 @@ fn test_store_register_zero_page(
 ) {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     register_to_test(&mut cpu, 0x2F);
@@ -42,7 +42,7 @@ fn test_store_register_absolute(
 ) {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     register_to_test(&mut cpu, 0x2F);
@@ -68,7 +68,7 @@ fn test_store_register_zero_page_x(
 ) {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_x(0x0F);
@@ -132,7 +132,7 @@ fn sty_zero_page_x_can_store_the_y_register_into_memory() {
 fn sta_absolute_x_can_store_the_register_into_memory() {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_x(0x0F);
@@ -157,7 +157,7 @@ fn sta_absolute_x_can_store_the_register_into_memory() {
 fn sta_absolute_y_can_store_the_register_into_memory() {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_y(0x0F);
@@ -182,7 +182,7 @@ fn sta_absolute_y_can_store_the_register_into_memory() {
 fn sta_indirect_x_can_store_the_register_into_memory() {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_x(0x0F);
@@ -208,7 +208,7 @@ fn sta_indirect_x_can_store_the_register_into_memory() {
 fn sta_indirect_y_can_store_the_register_into_memory() {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_y(0x0F);

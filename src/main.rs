@@ -3,7 +3,7 @@ use davepoo_6502::m6502;
 fn main() {
     let mut mem: m6502::Mem = m6502::Mem::new();
     let mut cpu = m6502::CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_x(0x0F);

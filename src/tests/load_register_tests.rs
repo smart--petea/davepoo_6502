@@ -16,7 +16,7 @@ fn test_load_register_immediate(
 ) {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_z(1);
@@ -43,7 +43,7 @@ fn test_load_register_zero_page(
 ) {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_z(1);
@@ -85,7 +85,7 @@ fn ldy_immediate_can_load_a_value_into_the_y_register() {
 fn lda_immediate_can_affect_the_zero_flag() {
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_a(0x44);
@@ -126,7 +126,7 @@ fn test_load_register_zero_page_y(
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_y(5);
@@ -158,7 +158,7 @@ fn test_load_register_zero_page_x(
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_z(1);
@@ -205,7 +205,7 @@ fn the_cpu_does_nothing_when_we_execute_zero_cycles() {
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     let num_cycles: s32 = 0;
@@ -222,7 +222,7 @@ fn cpu_can_execute_more_cycles_than_requested_if_required_by_instructions () {
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     mem[0xFFFC] = CPU::INS_LDA_IM;
@@ -240,7 +240,7 @@ fn lda_zero_page_x_can_load_a_value_into_the_a_register_when_it_wraps() {
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_x(0xFF);
@@ -273,7 +273,7 @@ fn test_load_register_absolute(
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_z(1);
@@ -320,7 +320,7 @@ fn test_load_register_absolute_x(
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_z(1);
@@ -353,7 +353,7 @@ fn test_load_register_absolute_y(
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_z(1);
@@ -401,7 +401,7 @@ fn test_load_register_absolute_x_when_crossing_page(
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_x(0xFF);
@@ -447,7 +447,7 @@ fn test_load_register_absolute_y_when_crossing_page(
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_y(0xFF);
@@ -486,7 +486,7 @@ fn lda_indirect_x_can_load_a_value_into_the_a_register() {
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_x(0x04);
@@ -516,7 +516,7 @@ fn lda_indirect_y_can_load_a_value_into_the_a_register() {
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_y(0x04);
@@ -546,7 +546,7 @@ fn lda_indirect_y_can_load_a_value_into_the_a_register_when_it_crosses_a_page() 
     //set up;
     let mut mem: Mem = Mem::new();
     let mut cpu = CPU::new();
-    cpu.reset(&mut mem);
+    cpu.reset(0xFFFC, &mut mem);
 
     //given:
     cpu.set_y(0xFF);

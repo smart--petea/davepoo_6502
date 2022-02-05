@@ -48,7 +48,7 @@ pub mod m6502 {
     #[derive(Debug, Clone)]
     pub struct CPU {
         pub pc: Word, //program counter
-        pub sp: Word, //stack pointer
+        pub sp: Byte, //stack pointer
 
         pub a: Byte, //registers
         pub x: Byte, //registers
@@ -77,10 +77,10 @@ pub mod m6502 {
             self.load_register_set_status(value);
         }
 
-        pub fn reset(&mut self, memory: &mut Mem)
+        pub fn reset(&mut self, reset_vector: Word, memory: &mut Mem)
         {
-            self.set_pc(0xFFFC);
-            self.set_sp(0x0100);
+            self.set_pc(reset_vector);
+            self.set_sp(0xFF);
             self.set_d(0);
             self.set_a(0);
             self.set_x(0);
@@ -121,8 +121,8 @@ pub mod m6502 {
         pub const INS_LDY_ABS: Byte = 0xAC;
         pub const INS_LDY_ABSX: Byte = 0xBC;
 
-        //L
         pub const INS_JSR: Byte = 0x20;
+        pub const INS_RTS: Byte = 0x60;
 
         //STA
         pub const INS_STA_ZP: Byte = 0x85;
@@ -195,6 +195,19 @@ pub mod m6502 {
             abs_address_x
         }
 
+        /** Addressing mode - Absolute with X offset
+         * - Always takes a cycle for the X page boundary
+         * - See "STA Absolute,X
+         * */
+        fn addr_absolute_x_5(&mut self, cycles: &mut s32, memory: &Mem) -> Word {
+            let abs_address = self.fetch_word(cycles, memory);
+            let abs_address_x = abs_address + self.x() as Word;
+
+            *cycles = *cycles - 1;
+
+            abs_address_x
+        }
+
         /** Addressing mode - Indirect X | Indexed Indirect */
         fn addr_indirect_x(&mut self, cycles: &mut s32, memory: &Mem) -> Word {
             let mut zp_address: Word = self.fetch_byte(cycles, memory) as Word;
@@ -215,6 +228,18 @@ pub mod m6502 {
             abs_address_y
         }
 
+        /** Addressing mode - Absolute with Y offset
+         * - Always takes a cycle for the Y page boundary
+         * - See "STA Absolute,Y
+         * */
+        fn addr_absolute_y_5(&mut self, cycles: &mut s32, memory: &Mem) -> Word {
+            let abs_address: Word = self.fetch_word(cycles, memory);
+            let abs_address_y = abs_address + self.y() as Word;
+            *cycles = *cycles - 1;
+
+            abs_address_y
+        }
+
         /** Addressing mode - Indirect Y | Indirect Indexed */
         fn addr_indirect_y(&mut self, cycles: &mut s32, memory: &Mem) -> Word {
             let mut zp_address: Word = self.fetch_byte(cycles, memory) as Word;
@@ -226,7 +251,6 @@ pub mod m6502 {
 
             effective_address_y
         }
-
 
         //@return the number of cycles that were used
         pub fn execute(&mut self, cycles: s32, memory: &mut Mem) -> s32 {
@@ -362,23 +386,16 @@ pub mod m6502 {
 
                     }
                     Self::INS_STA_ABSX => {
-                        //TODO: AddAbsoluteX can consume an extra cycle on boundaries?
-                        let address = self.addr_absolute_x(&mut cycles, memory);
+                        let address = self.addr_absolute_x_5(&mut cycles, memory);
                         self.write_byte(self.a(), &mut cycles, address, memory);
-
-                        cycles = cycles - 1; //todo why the extra cycle is consumed
                     }
                     Self::INS_STA_ABSY => {
-                        //TODO: AddAbsoluteY can consume an extra cycle on boundaries?
-                        let address = self.addr_absolute_y(&mut cycles, memory);
+                        let address = self.addr_absolute_y_5(&mut cycles, memory);
                         self.write_byte(self.a(), &mut cycles, address, memory);
-
-                        cycles = cycles - 1; //todo why the extra cycle is consumed
                     }
                     Self::INS_JSR => {
                         let sub_addr: Word = self.fetch_word(&mut cycles, memory);
-                        self.write_word( self.sp(), &mut cycles, self.pc() - 1, memory,);
-
+                        self.push_pc_to_stack(&mut cycles, memory);
                         self.set_pc(sub_addr);
                         cycles = cycles - 1;
                     }
@@ -466,6 +483,21 @@ pub mod m6502 {
             memory[address + 1] = (value >> 8) as Byte;
 
             *cycles = *cycles - 2;
+        }
+
+        /** @return the stack pointer as a full 16-bit address (in the 1st page)*/
+        pub fn sp_to_address(&self) -> Word {
+            0x100 | (self.sp() as Word)
+        }
+
+        /** Push the PC-1 onto the stack */
+        pub fn push_pc_to_stack(
+            &mut self,
+            cycles: &mut s32,
+            memory: &mut Mem,
+        ) {
+            self.write_word(self.pc() - 1, cycles, self.sp_to_address(), memory,);
+            self.set_sp(self.sp() - 2);
         }
     }
 }
