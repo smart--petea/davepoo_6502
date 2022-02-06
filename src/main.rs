@@ -1,24 +1,27 @@
-use davepoo_6502::m6502;
+use davepoo_6502::m6502::*;
 
 fn main() {
-    let mut mem: m6502::Mem = m6502::Mem::new();
-    let mut cpu = m6502::CPU::new();
-    cpu.reset(0xFFFC, &mut mem);
+    let mut mem: Mem = Mem::new();
+    let mut cpu = CPU::new();
+    cpu.reset(0xFF00, &mut mem);
 
     //given:
-    cpu.set_x(0x0F);
-    cpu.set_a(0x42);
-    mem[0xFFFC] = m6502::CPU::INS_STA_ABSX;
-    mem[0xFFFD] = 0x00;
-    mem[0xFFFE] = 0x80;
-    mem[0x800F] = 0x00;
-    const EXPECTED_CYCLES: m6502::s32 = 5;
+    mem[0xFF00] = CPU::INS_JSR;
+    mem[0xFF01] = 0x00;
+    mem[0xFF02] = 0x80;
+    mem[0x8000] = CPU::INS_RTS;
+    mem[0xFF03] = CPU::INS_LDA_IM;
+    mem[0xFF04] = 0x42;
+
+    //6 cycles for CPU::INS_JSR
+    //6 cycles for CPU::INS_RTS
+    //2 cycles for CPU::INS_LDA_IM
+    const EXPECTED_CYCLES: s32 = 6 + 6 + 2;
 
     //when:
     let actual_cycles = cpu.execute(EXPECTED_CYCLES, &mut mem);
 
     //then:
-    assert_eq!(actual_cycles, actual_cycles);
-    assert_eq!(mem[0x800F], 0x42);
-
+    assert_eq!(actual_cycles, EXPECTED_CYCLES);
+    assert_eq!(cpu.a(), 0x42);
 }

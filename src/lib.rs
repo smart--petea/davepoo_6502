@@ -399,6 +399,11 @@ pub mod m6502 {
                         self.set_pc(sub_addr);
                         cycles = cycles - 1;
                     }
+                    Self::INS_RTS => {
+                        let return_address = self.pop_word_from_stack(&mut cycles, memory);
+                        self.set_pc(return_address + 1);
+                        cycles = cycles - 2;
+                    }
                     _ => {
                         println!("Instruction not handled {}", ins);
                     }
@@ -496,8 +501,22 @@ pub mod m6502 {
             cycles: &mut s32,
             memory: &mut Mem,
         ) {
-            self.write_word(self.pc() - 1, cycles, self.sp_to_address(), memory,);
+            self.write_word(self.pc() - 1, cycles, self.sp_to_address() - 1, memory,);
             self.set_sp(self.sp() - 2);
+        }
+
+        /** Pop a word from the stack */
+        pub fn pop_word_from_stack(
+            &mut self,
+            cycles: &mut s32,
+            memory: &mut Mem,
+        ) -> Word {
+            let value_from_stack = self.read_word(cycles, self.sp_to_address() + 1, memory);
+            self.set_sp(self.sp() + 2);
+
+            *cycles = *cycles - 1;
+
+            value_from_stack
         }
     }
 }

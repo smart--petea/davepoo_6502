@@ -17,9 +17,7 @@ fn can_jump_to_subroutine_and_jump_back_again() {
     //6 cycles for CPU::INS_JSR
     //6 cycles for CPU::INS_RTS
     //2 cycles for CPU::INS_LDA_IM
-    const EXPECTED_CYCLES: s32 = 6 + 6;
-
-    let cpu_copy = cpu.clone();
+    const EXPECTED_CYCLES: s32 = 6 + 6 + 2;
 
     //when:
     let actual_cycles = cpu.execute(EXPECTED_CYCLES, &mut mem);
